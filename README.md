@@ -12,6 +12,12 @@ safety monitoring and emergency controls.
 > flight, work through the rehearsal steps in [Flying real drones](#flying-real-drones),
 > get the permits, and keep a trained pilot in command at the emergency controls.
 
+📖 **New to Langit Swarm?** Read the illustrated, step-by-step **[User Guide](docs/USER_GUIDE.md)**:
+install, the screen, designing, Blender import, validation, simulator rehearsal and the
+emergency controls — with annotated screenshots.
+
+<p align="center"><a href="docs/USER_GUIDE.md"><img src="docs/images/02-overview.png" width="760" alt="The Langit Swarm Design tab with numbered callouts"></a></p>
+
 ---
 
 ## Contents
@@ -25,6 +31,7 @@ safety monitoring and emergency controls.
 8. [Performance](#performance)
 9. [Project layout and tests](#project-layout-and-tests)
 10. [Known limitations](#known-limitations)
+11. [Contributors](#contributors)
 
 ---
 
@@ -86,8 +93,9 @@ safety monitoring and emergency controls.
 **Ready-made Windows app:** download `LangitSwarm-v0.3.2-windows-x64.zip` from the
 [Releases page](https://github.com/yudhis7/LangitSwarm-/releases), right-click → *Extract All*,
 then double-click `LangitSwarm.exe` (see `START HERE.txt` inside). No Python needed.
+Step-by-step with pictures: [User Guide → Install and start](docs/USER_GUIDE.md#2-install-and-start-the-app).
 
-
+**From source:**
 1. Install **Python 3.11 or 3.12, 64-bit** from python.org (tick *Add python.exe to PATH*).
 2. Double-click **`run.bat`**. The first start creates `.venv` and installs the packages
    (a few minutes); then the app window opens.
@@ -417,3 +425,12 @@ start-up smoke test, and publishes the zip as a GitHub release. Pushing a `v*` t
   notes* and validation before rehearsing. Yaw and pyro are not supported; music is not
   played by the app. Light commands outside the Skybrush LED format stop that drone's light
   program, as the Skybrush firmware does.
+
+---
+
+## Contributors
+- [**@yudhis7**](https://github.com/yudhis7) — founder and project owner: product vision and
+  requirements, the Langit Swarm brand, Windows testing.
+- Claude (Anthropic) — AI pair programmer: code and documentation.
+
+See [CONTRIBUTORS.md](CONTRIBUTORS.md) for how to contribute.

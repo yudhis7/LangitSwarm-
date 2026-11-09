@@ -36,3 +36,5 @@ Your shows, exports, flight logs and imported files are kept in
 
 Requirements: Windows 10 or 11, 64-bit. 8 GB RAM recommended for 3,000+ drones.
 Full manual: README.md. Changes: CHANGELOG.md.
+Illustrated step-by-step guide:
+  https://github.com/yudhis7/LangitSwarm-/blob/main/docs/USER_GUIDE.md

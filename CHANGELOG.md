@@ -1,5 +1,11 @@
 # Changelog
 
+## Documentation — 2026-11-09
+- New illustrated [User Guide](docs/USER_GUIDE.md): install and first start on Windows, a tour of
+  the screen, designing formations, safety settings, compile & validate, Blender/Skybrush import,
+  export, simulator rehearsal and the emergency controls, with annotated screenshots.
+- Added [CONTRIBUTORS.md](CONTRIBUTORS.md) and a Contributors section in the README.
+
 ## 0.3.2 — 2026-11-09
 ### Fixed
 - Windows: the app window crashed while opening ("Argument 'picture' must be a picture that can
