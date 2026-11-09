@@ -398,6 +398,10 @@ python tests/test_mavlink_import.py # imported show over UDP: staggered take-off
 python tests/test_server_import.py  # import API: upload, placement, export, autosave, remove
 ```
 
+**Windows release build (GitHub Actions):** *Actions → Windows release → Run workflow* (enter a
+tag such as `v0.3.3`) builds `LangitSwarm.exe` on a Windows runner, runs the engine tests and a
+start-up smoke test, and publishes the zip as a GitHub release. Pushing a `v*` tag does the same.
+
 ---
 
 ## Known limitations

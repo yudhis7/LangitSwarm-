@@ -1,0 +1,103 @@
+# Builds LangitSwarm.exe on a real Windows machine, smoke-tests it and publishes a GitHub
+# release with the zip.  Run it from the Actions tab ("Windows release" -> "Run workflow")
+# or by pushing a tag such as v0.3.3.
+name: Windows release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag, e.g. v0.3.2"
+        required: true
+        default: "v0.3.2"
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pyinstaller
+
+      - name: Engine tests
+        run: python tests/test_engine.py
+
+      - name: Build LangitSwarm.exe
+        run: python -m PyInstaller --noconfirm --clean LangitSwarm.spec
+
+      - name: Add the files that sit next to the exe
+        shell: pwsh
+        run: |
+          $d = "dist/LangitSwarm"
+          Copy-Item assets/windows/LangitSwarm.exe.config $d
+          Copy-Item assets/windows/*.cmd $d
+          Copy-Item "assets/windows/START HERE.txt" $d
+          Copy-Item -Recurse samples "$d/samples"
+          Copy-Item README.md, CHANGELOG.md $d
+
+      - name: Smoke test (starts, compiles and validates the demo show)
+        shell: pwsh
+        run: |
+          $env:LANGIT_HOME = Join-Path $env:RUNNER_TEMP "lshome"
+          $p = Start-Process -FilePath "dist/LangitSwarm/LangitSwarm.exe" -ArgumentList "--no-window", "--port", "8799" -PassThru
+          $info = $null
+          for ($i = 0; $i -lt 120 -and -not $info; $i++) {
+            Start-Sleep -Seconds 2
+            try { $info = Invoke-RestMethod http://127.0.0.1:8799/api/info } catch {}
+          }
+          if (-not $info) { Stop-Process $p -Force; throw "LangitSwarm.exe did not start" }
+          Write-Host "Started $($info.name) $($info.version)"
+          $design = $null
+          for ($i = 0; $i -lt 200 -and -not ($design -and $design.validation); $i++) {
+            Start-Sleep -Seconds 2
+            try { $design = Invoke-RestMethod http://127.0.0.1:8799/api/design } catch {}
+          }
+          Stop-Process $p -Force
+          if (-not ($design -and $design.validation)) { throw "the demo show did not compile" }
+          Write-Host "Demo show: $($design.drones) drones, safe: $($design.validation.ok)"
+          if (-not $design.validation.ok) { throw "the demo show failed validation" }
+
+      - name: Zip
+        shell: pwsh
+        run: |
+          $zip = "LangitSwarm-$env:TAG-windows-x64.zip"
+          Compress-Archive -Path dist/LangitSwarm -DestinationPath $zip
+          $h = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          "$h  $zip" | Out-File -Encoding ascii "$zip.sha256"
+          Write-Host "$zip  $h"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LangitSwarm-${{ env.TAG }}-windows-x64
+          path: LangitSwarm-*-windows-x64.zip*
+
+      - name: Publish the GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $zip = "LangitSwarm-$env:TAG-windows-x64.zip"
+          $notes = (Get-Content .github/release-notes.md -Raw) -replace '\{TAG\}', $env:TAG
+          $notes | Out-File -Encoding utf8 notes.md
+          gh release view $env:TAG *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $env:TAG $zip "$zip.sha256" --clobber
+          } else {
+            gh release create $env:TAG $zip "$zip.sha256" --target $env:GITHUB_SHA `
+              --title "Langit Swarm $env:TAG - Windows" --notes-file notes.md
+          }
