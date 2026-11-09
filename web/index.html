@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Langit Swarm — Drone Show Control</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#05070d">
+<link rel="icon" type="image/png" href="brand/favicon.png">
+<script>
+/* Start-up guard - a plain script, so it runs even where the app's modules cannot.
+   Tells the launcher the page arrived and shows start-up problems on the splash
+   instead of leaving a blank screen. */
+(function () {
+  var shell = /[?&]shell=window/.test(location.search) ? 'window' : 'browser';
+  window.__lsShell = shell;
+  function report(what, msg) {
+    try {
+      var x = new XMLHttpRequest();
+      x.open('POST', '/api/client/' + what, true);
+      x.setRequestHeader('Content-Type', 'application/json');
+      x.send(JSON.stringify({ shell: shell, msg: msg || '' }));
+    } catch (e) { /* nothing to report to */ }
+  }
+  window.__lsReport = report;
+  function showErr(text) {
+    var go = function () {
+      var m = document.getElementById('splashMsg');
+      if (m) { m.className = 'spl-msg spl-err'; m.textContent = text; }
+      var s = document.getElementById('splash');
+      if (s) s.className = '';
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else go();
+  }
+  window.__lsShowErr = showErr;
+  window.addEventListener('error', function (e) {
+    var t = e && e.message ? e.message + (e.filename ? ' (' + e.filename.split('/').pop() + ':' + e.lineno + ')' : '')
+      : 'a file failed to load: ' + ((e && e.target && (e.target.src || e.target.href)) || '?');
+    report('error', t);
+    if (!window.__lsReady) showErr('Start-up error: ' + t);
+  }, true);
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e && e.reason;
+    var t = String((r && (r.stack || r.message)) || r);
+    report('error', t);
+    if (!window.__lsReady) showErr('Start-up error: ' + t);
+  });
+  var modern = ('noModule' in document.createElement('script')) && !!window.fetch && !!window.CSS &&
+    !!CSS.supports && CSS.supports('color', 'var(--x)');
+  report('hello', modern ? '' : 'outdated web engine: ' + navigator.userAgent);
+  if (!modern) {
+    showErr('This window uses an outdated web engine. Open ' + location.origin +
+      ' in Microsoft Edge or Google Chrome, or install the Microsoft Edge WebView2 Runtime.');
+  }
+  setTimeout(function () {
+    if (!window.__lsReady) showErr('Still starting... If this does not change, open ' + location.origin +
+      ' in Microsoft Edge or Google Chrome.');
+  }, 60000);
+})();
+</script>
+<link rel="stylesheet" href="style.css">
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
+</head>
+<body>
+<div id="splash">
+  <img src="brand/logo_full_dark.png" alt="langit Swarm. — We don't just light the night, we make it fly">
+  <div class="spl-bar"><div></div></div>
+  <div class="spl-msg" id="splashMsg">Starting…</div>
+</div>
+<header id="topbar">
+  <button class="brand" id="brandBtn" title="About Langit Swarm">
+    <img src="brand/lockup_dark.png" alt="langit Swarm." class="lockup"><span class="ver" id="ver"></span>
+  </button>
+  <nav class="tabs">
+    <button class="tab active" data-tab="design">Design</button>
+    <button class="tab" data-tab="fleet">Fleet &amp; Show</button>
+  </nav>
+  <div class="topstatus">
+    <span id="stateChip" class="chip">DISCONNECTED</span>
+    <span id="clock" class="mono">T+ 0:00.0</span>
+    <span id="fleetSummary" class="muted"></span>
+  </div>
+</header>
+
+<main id="layout">
+  <!-- ======================= LEFT PANEL ======================= -->
+  <aside id="left" class="panel">
+    <section class="pane" data-pane="design">
+      <div class="block">
+        <div class="row">
+          <label class="grow">Show name<input id="showName" type="text"></label>
+        </div>
+        <div class="row">
+          <label>Drones<input id="showDrones" type="number" min="2" max="10000" step="1"></label>
+          <label>Spares<input id="showSpares" type="number" min="0" max="2000" step="1"></label>
+        </div>
+        <div class="row btns">
+          <button id="btnNew" title="Replace the show with the demo show for this drone count">New demo</button>
+          <button id="btnSave">Save</button>
+          <select id="loadSelect"><option value="">Load…</option></select>
+        </div>
+        <div class="row btns">
+          <button id="btnImport" class="grow" title="Import a show animated in Blender with Skybrush Studio (.skyc, show.json or CSV .zip)">Import Blender / Skybrush show…</button>
+          <input id="importFile" type="file" accept=".skyc,.zip,.json,.gz" hidden>
+        </div>
+      </div>
+
+      <div class="block" id="importBlock" hidden>
+        <div class="blockhead">Imported show
+          <button id="btnImpRemove" class="small" title="Go back to the formation timeline">Remove import</button></div>
+        <div id="impInfo" class="kv"></div>
+        <div class="group">Placement on the field</div>
+        <div class="row">
+          <label>Rotate (°)<input id="impRot" type="number" step="15" min="-360" max="360"></label>
+          <label>Offset x (m)<input id="impOffX" type="number" step="1"></label>
+          <label>Offset y (m)<input id="impOffY" type="number" step="1"></label>
+        </div>
+        <div class="row">
+          <label>Mission path tolerance (m)<input id="impTol" type="number" step="0.05" min="0.05" max="5"></label>
+          <button id="btnImpCenter" class="small" title="Put the centre of the pad grid on the take-off field centre">Centre on take-off field</button>
+        </div>
+        <p class="hint">Blender Front view = audience view (x right, y away from the audience, z up). Rotate turns the show about the centre of its pad grid; the offset then moves it (from its Skybrush position). Each drone keeps its own Skybrush path and take-off time; spares stand by but cannot replace a missing drone.</p>
+        <ul id="impNotes" class="notes"></ul>
+      </div>
+
+      <details class="block" id="settingsBlock">
+        <summary>Safety &amp; field settings</summary>
+        <div id="settingsForm"></div>
+      </details>
+
+      <div class="block" id="timelineBlock">
+        <div class="blockhead">Timeline <span class="muted" id="tlCount"></span>
+          <button id="btnAdd" class="small">+ Formation</button></div>
+        <ol id="timeline"></ol>
+      </div>
+
+      <div class="block" id="editor" hidden>
+        <div class="blockhead">Formation <span id="edIndex" class="muted"></span></div>
+        <div id="edForm"></div>
+      </div>
+    </section>
+
+    <section class="pane" data-pane="fleet" hidden>
+      <div class="block">
+        <div class="blockhead">Fleet connection</div>
+        <div class="row">
+          <label class="grow">Type
+            <select id="connKind">
+              <option value="sim">Simulator (rehearsal)</option>
+              <option value="mavlink">Real drones — MAVLink UDP</option>
+            </select>
+          </label>
+        </div>
+        <div id="simOpts">
+          <div class="row">
+            <label>Pre-flight faults %<input id="simPre" type="number" value="1" min="0" max="50" step="0.5"></label>
+            <label>In-flight faults /1k/min<input id="simIn" type="number" value="0.4" min="0" max="50" step="0.1"></label>
+          </div>
+        </div>
+        <div id="mavOpts" hidden>
+          <label>UDP endpoints (one per line, one per radio network / channel)
+            <textarea id="mavEndpoints" rows="3">udp:0.0.0.0:14550</textarea></label>
+          <p class="hint">Drones must stream MAVLink to this computer. Each channel can hold up to 254 system IDs; drones are also told apart by IP address.</p>
+        </div>
+        <div class="row btns">
+          <button id="btnConnect" class="primary">Connect</button>
+          <button id="btnDisconnect">Disconnect</button>
+        </div>
+      </div>
+
+      <div class="block">
+        <div class="blockhead">Show operations</div>
+        <ol class="steps">
+          <li><button id="opPlan">1 · Map pads &amp; re-plan</button>
+            <span class="hint">Finds every drone on its pad, picks flyers and spares, re-compiles and validates the show for the drones really on the field.</span></li>
+          <li><button id="opUpload">2 · Upload show</button></li>
+          <li>
+            <div class="sub">3 · Go / No-Go</div>
+            <div id="checklist"></div>
+            <div class="row">
+              <label>Wind now (m/s)<input id="wind" type="number" min="0" max="40" step="0.1" placeholder="measure"></label>
+              <label>Audience breach
+                <select id="audAction"><option value="land">Land drone</option><option value="kill">Stop motors</option></select>
+              </label>
+            </div>
+            <div id="gonogo" class="gonogo"></div>
+          </li>
+          <li>
+            <div class="row">
+              <label>Countdown (s)<input id="countdown" type="number" value="30" min="10" max="600"></label>
+              <button id="opStart" class="go">4 · START</button>
+            </div>
+            <button id="opAbort" class="warnbtn">Abort countdown</button>
+          </li>
+        </ol>
+        <div id="opProgress" class="progress" hidden><div></div><span></span></div>
+      </div>
+
+      <div class="block" id="droneBlock" hidden>
+        <div class="blockhead">Drone <span id="droneTitle" class="mono"></span></div>
+        <div id="droneInfo" class="kv"></div>
+        <div class="row btns">
+          <button data-dact="exit">Take out of show</button>
+          <button data-dact="land">Land</button>
+          <button data-dact="kill" class="danger">Kill</button>
+        </div>
+      </div>
+    </section>
+  </aside>
+
+  <!-- ======================= VIEWPORT ======================= -->
+  <section id="center">
+    <div id="viewport"></div>
+    <div id="viewTools">
+      <button id="camAudience" class="small">Audience view</button>
+      <button id="camTop" class="small">Top</button>
+      <button id="camSide" class="small">Side</button>
+      <label class="small"><input type="checkbox" id="showDark" checked> unlit drones</label>
+      <label class="small" id="colorModeWrap"><input type="checkbox" id="statusColors"> status colours</label>
+      <label class="small" title="Show the Langit Swarm logo on the 3D view (for client previews and recordings)"><input type="checkbox" id="showMark" checked> logo</label>
+    </div>
+    <img id="viewMark" src="brand/lockup_dark.png" alt="">
+    <div id="hud" class="mono"></div>
+    <div id="timebar">
+      <button id="btnPlay" class="iconbtn" title="Play / pause">▶</button>
+      <select id="speed"><option>0.5</option><option selected>1</option><option>2</option><option>4</option><option>8</option></select>
+      <div id="scrubWrap"><div id="segStrip"></div><input id="scrub" type="range" min="0" max="100" step="0.1" value="0"></div>
+      <span id="timeLabel" class="mono">0:00.0 / 0:00</span>
+    </div>
+  </section>
+
+  <!-- ======================= RIGHT PANEL ======================= -->
+  <aside id="right" class="panel">
+    <section class="pane" data-pane="design">
+      <div class="block">
+        <div class="row btns">
+          <button id="btnCompile" class="primary grow">Compile &amp; validate</button>
+          <button id="btnExport">Export package</button>
+        </div>
+        <div id="compileProgress" class="progress" hidden><div></div><span></span></div>
+        <div id="dirty" class="hint warn" hidden>Show changed — compile to update the preview.</div>
+      </div>
+      <div class="block">
+        <div class="blockhead">Safety validation</div>
+        <div id="validation" class="checks"><p class="muted">Not compiled yet.</p></div>
+      </div>
+      <div class="block">
+        <div class="blockhead">Show</div>
+        <div id="stats" class="kv"></div>
+        <ol id="segments" class="seglist"></ol>
+      </div>
+      <div class="block" id="exportBlock" hidden>
+        <div class="blockhead">Export</div>
+        <div id="exportInfo"></div>
+      </div>
+    </section>
+
+    <section class="pane" data-pane="fleet" hidden>
+      <div class="block">
+        <div class="blockhead">Fleet status</div>
+        <div id="counts" class="counts"></div>
+        <canvas id="grid" width="300" height="200"></canvas>
+        <div id="gridTip" class="hint mono"></div>
+      </div>
+      <div class="block grow">
+        <div class="blockhead">Events</div>
+        <ol id="events" class="events"></ol>
+      </div>
+    </section>
+  </aside>
+</main>
+
+<footer id="emergency" hidden>
+  <span class="elabel">EMERGENCY</span>
+  <button id="emHold" class="em hold">HOLD ALL</button>
+  <button id="emResume" class="em">RESUME</button>
+  <button id="emReturn" class="em ret">COORDINATED RETURN</button>
+  <button id="emLand" class="em land">LAND ALL IN PLACE</button>
+  <button id="emKill" class="em kill">KILL ALL</button>
+</footer>
+
+<div id="toast"></div>
+<dialog id="aboutDlg">
+  <form method="dialog">
+    <img src="brand/logo_full_dark.png" alt="langit Swarm." class="about-logo">
+    <p class="about-sub">Drone light show designer, simulator and fleet controller<br><span id="aboutVer"></span></p>
+    <div class="kv about-kv">
+      <span class="k">Data folder</span><span class="v" id="aboutHome"></span>
+      <span class="k">Show design</span><span class="v">built-in formations · Blender / Skybrush Studio import</span>
+      <span class="k">Fleet</span><span class="v">simulator · PX4 / ArduPilot over MAVLink</span>
+    </div>
+    <p class="hint">Built with Three.js, NumPy, SciPy, POT, aiohttp, pymavlink and pywebview. Imports the open
+      Skybrush show format. Software is one layer of show safety: fly only with permits, rehearsals and a
+      pilot in command at the emergency controls.</p>
+    <menu><button value="close" class="primary">Close</button></menu>
+  </form>
+</dialog>
+<dialog id="killDlg">
+  <form method="dialog">
+    <h3>Stop all motors?</h3>
+    <p>Every airborne drone will fall. Use only when continued flight is more dangerous than falling drones. Type <b>KILL</b> to confirm.</p>
+    <input id="killText" autocomplete="off">
+    <menu><button value="cancel">Cancel</button><button id="killGo" value="ok" class="danger">Stop motors</button></menu>
+  </form>
+</dialog>
+<script type="module" src="app.js"></script>
+</body>
+</html>

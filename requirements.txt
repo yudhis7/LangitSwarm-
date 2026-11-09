@@ -1,0 +1,8 @@
+numpy>=1.26
+scipy>=1.11
+pillow>=10.1
+aiohttp>=3.9
+pymavlink>=2.4.40
+POT>=0.9.3
+lap>=0.5.12
+pywebview>=5.0 ; sys_platform == "win32"

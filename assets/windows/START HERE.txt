@@ -1,0 +1,38 @@
+Langit Swarm 0.3.2 for Windows (64-bit)
+=======================================
+
+1. EXTRACT the zip first: right-click the zip -> "Extract All..." -> e.g. C:\LangitSwarm
+   (do not start the program from inside the zip; LangitSwarm.exe must stay
+   next to the _internal folder).
+
+2. Double-click LangitSwarm.exe.
+   - The app is not code-signed yet, so Windows SmartScreen may show
+     "Windows protected your PC": click "More info", then "Run anyway".
+   - A black console window opens first and shows progress. The first start
+     can take up to a minute while Windows checks the program files.
+   - Windows Firewall may ask about network access: allow it on private
+     networks (needed to talk to real drones over MAVLink).
+
+3. The app window opens (Microsoft Edge WebView2, built into Windows 11 and most
+   Windows 10 PCs). If the window cannot show the app, Langit Swarm closes it and
+   opens itself in your web browser automatically - the app works the same there.
+   Keep the console window open; closing it closes the app.
+
+If the window stays black or blank
+----------------------------------
+- Wait about a minute: the app switches to your browser by itself.
+- Double-click "Safe mode (no GPU).cmd" (app window without graphics acceleration).
+- Or double-click "Open in browser.cmd".
+- If the console says the WebView2 Runtime is missing, install the "Evergreen
+  WebView2 Runtime" from Microsoft to get the app window (the browser works anyway).
+- Still stuck? Send us the log file:  %USERPROFILE%\LangitSwarm\logs\launcher.log
+
+Try it:  Design tab -> "Import Blender / Skybrush show..." ->
+         samples\sample_100_drones.skyc
+         Fleet & Show tab -> Simulator -> Connect -> Plan -> rehearse.
+
+Your shows, exports, flight logs and imported files are kept in
+%USERPROFILE%\LangitSwarm
+
+Requirements: Windows 10 or 11, 64-bit. 8 GB RAM recommended for 3,000+ drones.
+Full manual: README.md. Changes: CHANGELOG.md.
